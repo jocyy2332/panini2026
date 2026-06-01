@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Panini 2026">
+<title>Panini 2026</title>
+<style>
+  :root {
+    --green: #1a7a3a; --red: #b83232; --orange: #c05a00;
+    --dark: #1a1a2e; --bg: #f4f5f9; --card: #fff;
+    --border: #e0e0e0; --text: #222; --sub: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .header { background: var(--dark); color: #fff; padding: 14px 16px 10px; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 17px; font-weight: 700; }
+  .header p  { font-size: 11px; color: #aab; margin-top: 1px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; padding: 12px 12px 0; }
+  .stat { background: var(--card); border-radius: 10px; padding: 10px 6px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat-n { font-size: 22px; font-weight: 700; }
+  .stat-l { font-size: 10px; color: var(--sub); margin-top: 2px; }
+  .g { color: var(--green); } .r { color: var(--red); } .o { color: var(--orange); }
+
+  /* Progress */
+  .prog-wrap { padding: 10px 12px 0; }
+  .prog-lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); margin-bottom: 4px; }
+  .prog-bar { height: 7px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+  .prog-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width .4s; }
+
+  /* Tabs */
+  .tabs { display: flex; overflow-x: auto; background: var(--card); border-bottom: 1px solid var(--border); margin-top: 12px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; padding: 11px 16px; font-size: 13px; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab.active { color: var(--dark); border-bottom-color: var(--dark); font-weight: 600; }
+
+  /* Panels */
+  .panel { display: none; padding: 12px; }
+  .panel.active { display: block; }
+
+  /* Ingresar */
+  .input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .input-row input { flex: 1; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; background: var(--card); color: var(--text); outline: none; }
+  .input-row input:focus { border-color: var(--dark); }
+  .btn { padding: 12px 18px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-blue  { background: var(--dark);  color: #fff; }
+  .btn-red   { background: var(--red);   color: #fff; }
+  .result-box { border-radius: 10px; padding: 14px 16px; font-size: 14px; line-height: 1.5; margin-bottom: 12px; display: none; }
+  .result-box.show { display: block; }
+  .result-box.ok   { background: #e8f7ed; color: var(--green); }
+  .result-box.rep  { background: #fff3e0; color: var(--orange); }
+  .result-box.err  { background: #fde8e8; color: var(--red); }
+  .history { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .hist-chip { padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+  .hist-ok  { background: #e8f7ed; color: var(--green); }
+  .hist-rep { background: #fff3e0; color: var(--orange); }
+
+  /* Bulk */
+  .bulk-ta { width: 100%; min-height: 100px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; resize: vertical; background: var(--card); color: var(--text); margin-bottom: 8px; }
+  .bulk-result { font-size: 12px; color: var(--sub); margin-top: 8px; }
+
+  /* Listas */
+  .search-bar { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--card); color: var(--text); width: 100%; margin-bottom: 10px; outline: none; }
+  .filter-row { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; scrollbar-width: none; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .fchip { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; background: var(--card); white-space: nowrap; }
+  .fchip.active { background: var(--dark); color: #fff; border-color: var(--dark); }
+
+  /* Group blocks */
+  .group-block { margin-bottom: 10px; }
+  .group-hdr { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: .05em; padding: 5px 10px; background: #ebebf0; border-radius: 8px; margin-bottom: 5px; }
+  .team-card { background: var(--card); border-radius: 10px; padding: 10px 12px; margin-bottom: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .team-hdr { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .team-name { font-size: 13px; font-weight: 600; flex: 1; }
+  .team-prog { font-size: 11px; color: var(--sub); }
+  .mini-bar  { height: 3px; background: #e0e0e0; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .mini-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+  .stk-grid  { display: grid; grid-template-columns: repeat(auto-fill,minmax(52px,1fr)); gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+  .stk { height: 52px; border-radius: 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #ddd; gap: 2px; }
+  .stk-code { font-size: 10px; font-weight: 700; color: #111; }
+  .stk-ico  { font-size: 11px; }
+  .stk.miss { background: #fde8e8; border-color: #e0a0a0; }
+  .stk.miss .stk-ico { color: var(--red); }
+  .stk.has  { background: #e8f7ed; border-color: #1a7a3a; }
+  .stk.has  .stk-ico { color: var(--green); }
+  .stk.rep  { background: #fff3e0; border-color: #c05a00; }
+  .stk.rep  .stk-ico { color: var(--orange); }
+
+  /* Rep/Miss lists */
+  .list-item { background: var(--card); border-radius: 10px; padding: 12px 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .list-item .code { font-weight: 700; font-size: 14px; min-width: 72px; }
+  .list-item .team { font-size: 13px; color: var(--sub); flex: 1; }
+  .list-item .badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+  .badge-rep  { background: #fff3e0; color: var(--orange); }
+  .badge-miss { background: #fde8e8; color: var(--red); }
+
+  /* Legend */
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--sub); margin-bottom: 10px; }
+  .ldot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 3px; vertical-align: middle; }
+
+  .empty { text-align: center; padding: 32px; color: var(--sub); font-size: 14px; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚽ Panini FIFA World Cup 2026</h1>
+  <p>Tracker de Figuritas</p>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat"><div class="stat-n g" id="s-have">-</div><div class="stat-l">Tengo</div></div>
+  <div class="stat"><div class="stat-n r" id="s-miss">-</div><div class="stat-l">Me faltan</div></div>
+  <div class="stat"><div class="stat-n o" id="s-rep">-</div><div class="stat-l">Repetidas</div></div>
+</div>
+
+<div class="prog-wrap">
+  <div class="prog-lbl"><span>Álbum completado</span><span id="s-pct">0%</span></div>
+  <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('ingresar',this)">➕ Ingresar</div>
+  <div class="tab" onclick="showTab('coleccion',this)">📋 Colección</div>
+  <div class="tab" onclick="showTab('repetidas',this)">🔁 Repetidas</div>
+  <div class="tab" onclick="showTab('faltan',this)">❌ Me faltan</div>
+</div>
+
+<!-- INGRESAR -->
+<div id="tab-ingresar" class="panel active">
+  <p class="section-title">Agregar una figurita</p>
+  <div class="input-row">
+    <input id="add-input" type="text" placeholder="Ej: MEX 5, ARG 12..." autocomplete="off" autocapitalize="characters"
+           onkeydown="if(event.key==='Enter')addOne()">
+    <button class="btn btn-green" onclick="addOne()">Agregar</button>
+  </div>
+  <div class="result-box" id="result-box"></div>
+
+  <div id="history-wrap" style="display:none">
+    <p class="section-title">Últimas agregadas</p>
+    <div class="history" id="history"></div>
+  </div>
+
+  <div style="margin-top:20px">
+    <p class="section-title">Agregar varias a la vez</p>
+    <textarea class="bulk-ta" id="bulk-ta" placeholder="Escribe varios códigos separados por coma o salto de línea&#10;Ej: MEX 1, MEX 3, ARG 5&#10;BRA 2&#10;ESP 7"></textarea>
+    <button class="btn btn-blue" onclick="addBulk()" style="width:100%">Agregar todas</button>
+    <div class="bulk-result" id="bulk-result"></div>
+  </div>
+</div>
+
+<!-- COLECCIÓN -->
+<div id="tab-coleccion" class="panel">
+  <input class="search-bar" id="col-search" placeholder="🔍 Buscar equipo o código..." oninput="renderCollection()">
+  <div class="filter-row">
+    <div class="fchip active" onclick="setFilter('todas',this)">Todas</div>
+    <div class="fchip" onclick="setFilter('tengo',this)">Tengo</div>
+    <div class="fchip" onclick="setFilter('faltan',this)">Me faltan</div>
+    <div class="fchip" onclick="setFilter('repetidas',this)">Repetidas</div>
+  </div>
+  <div class="legend">
+    <span><span class="ldot" style="background:var(--red)"></span>Me falta</span>
+    <span><span class="ldot" style="background:var(--green)"></span>Tengo</span>
+    <span><span class="ldot" style="background:var(--orange)"></span>Repetida</span>
+  </div>
+  <div id="col-board"></div>
+</div>
+
+<!-- REPETIDAS -->
+<div id="tab-repetidas" class="panel">
+  <p class="section-title">Para intercambiar</p>
+  <div id="rep-list"></div>
+</div>
+
+<!-- ME FALTAN -->
+<div id="tab-faltan" class="panel">
+  <input class="search-bar" id="miss-search" placeholder="🔍 Buscar..." oninput="renderMissing()">
+  <div id="miss-list"></div>
+</div>
+
+<script>
+let ALL = {};
+let openTeam = null;
+let colFilter = 'todas';
+let history = [];
+
+async function init() {
+  const r = await fetch('/api/stickers');
+  ALL = await r.json();
+  await updateStats();
+  renderCollection();
+  renderRepeated();
+  renderMissing();
+}
+
+async function updateStats() {
+  const r = await fetch('/api/stats');
+  const s = await r.json();
+  document.getElementById('s-have').textContent = s.have;
+  document.getElementById('s-miss').textContent = s.missing;
+  document.getElementById('s-rep').textContent  = s.repeated;
+  document.getElementById('s-pct').textContent  = s.pct + '%';
+  document.getElementById('prog-fill').style.width = s.pct + '%';
+}
+
+async function addOne() {
+  const inp = document.getElementById('add-input');
+  const key = inp.value.trim().toUpperCase();
+  if (!key) return;
+  inp.value = '';
+  const r = await fetch('/api/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key})});
+  const d = await r.json();
+  const box = document.getElementById('result-box');
+  box.className = 'result-box show';
+  if (d.ok) {
+    if (d.repeated) {
+      box.className += ' rep';
+      box.innerHTML = `🔁 <strong>${d.key}</strong> — ${d.team}<br>¡Repetida! Ya tienes <strong>${d.count}</strong> copias.`;
+    } else {
+      box.className += ' ok';
+      box.innerHTML = `✅ <strong>${d.key}</strong> — ${d.team}<br>¡Figurita agregada al álbum!`;
+    }
+    ALL[d.key].count = d.count;
+    addHistory(d.key, d.team, d.count, d.repeated);
+    await updateStats();
+    renderCollection();
+    renderRepeated();
+    renderMissing();
+  } else {
+    box.className += ' err';
+    box.innerHTML = `❌ ${d.msg}<br><small>Ejemplos: MEX 1, ARG 5, FRA 12, ESP 3</small>`;
+  }
+  setTimeout(() => inp.focus(), 100);
+}
+
+function addHistory(key, team, count, rep) {
+  history.unshift({key, team, count, rep});
+  history = history.slice(0, 8);
+  const wrap = document.getElementById('history-wrap');
+  const el   = document.getElementById('history');
+  wrap.style.display = 'block';
+  el.innerHTML = history.map(h =>
+    `<div class="hist-chip ${h.rep?'hist-rep':'hist-ok'}">${h.rep?'🔁':'✅'} ${h.key}</div>`
+  ).join('');
+}
+
+async function addBulk() {
+  const text = document.getElementById('bulk-ta').value;
+  if (!text.trim()) return;
+  const r = await fetch('/api/bulk', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})});
+  const d = await r.json();
+  const res = document.getElementById('bulk-result');
+  let msg = `✅ ${d.added.length} agregadas`;
+  if (d.not_found.length) msg += `  ·  ❌ No encontradas: ${d.not_found.join(', ')}`;
+  res.textContent = msg;
+  document.getElementById('bulk-ta').value = '';
+  // Refresh local data
+  const r2 = await fetch('/api/stickers');
+  ALL = await r2.json();
+  await updateStats();
+  renderCollection();
+  renderRepeated();
+  renderMissing();
+}
+
+function showTab(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+function setFilter(f, el) {
+  colFilter = f;
+  document.querySelectorAll('.fchip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderCollection();
+}
+
+function stkState(count) {
+  return count === 0 ? 'miss' : count === 1 ? 'has' : 'rep';
+}
+function stkIcon(count) {
+  return count === 0 ? '✗' : count === 1 ? '✓' : '2x';
+}
+
+function renderCollection() {
+  const q  = (document.getElementById('col-search')||{value:''}).value.toUpperCase();
+  const board = document.getElementById('col-board');
+  if (!board) return;
+
+  // Group data
+  const groups = {};
+  for (const [gid, teams] of Object.entries(groupTeams())) {
+    for (const {code, name} of teams) {
+      const stks = Object.entries(ALL).filter(([k,v]) => v.code === code);
+      if (!stks.length) continue;
+      if (q && !name.toUpperCase().includes(q) && !code.includes(q) && !`GRUPO ${gid}`.includes(q)) continue;
+      // Filter
+      const anyMatch = stks.some(([k,v]) => {
+        if (colFilter === 'tengo') return v.count >= 1;
+        if (colFilter === 'faltan') return v.count === 0;
+        if (colFilter === 'repetidas') return v.count > 1;
+        return true;
+      });
+      if (!anyMatch) continue;
+      if (!groups[gid]) groups[gid] = [];
+      groups[gid].push({code, name, stks});
+    }
+  }
+
+  if (!Object.keys(groups).length) {
+    board.innerHTML = '<div class="empty">No hay figuritas en esta vista</div>';
+    return;
+  }
+
+  board.innerHTML = Object.entries(groups).map(([gid, teams]) => `
+    <div class="group-block">
+      <div class="group-hdr">${gid === 'FW' ? 'Especiales' : 'Grupo ' + gid}</div>
+      ${teams.map(({code, name, stks}) => {
+        const key = gid+'__'+code;
+        const col = stks.filter(([k,v]) => v.count >= 1).length;
+        const rep = stks.filter(([k,v]) => v.count > 1).length;
+        const pct = Math.round(col / stks.length * 100);
+        const isOpen = openTeam === key;
+        const repInfo = rep > 0 ? ` · <span style="color:var(--orange)">${rep} rep.</span>` : '';
+        const stkHTML = isOpen ? `<div class="stk-grid">${
+          stks.filter(([k,v]) => {
+            if (colFilter === 'tengo') return v.count >= 1;
+            if (colFilter === 'faltan') return v.count === 0;
+            if (colFilter === 'repetidas') return v.count > 1;
+            return true;
+          }).map(([k,v]) => `
+            <div class="stk ${stkState(v.count)}" onclick="toggleStk('${k}',${v.count})">
+              <span class="stk-code">${k}</span>
+              <span class="stk-ico">${stkIcon(v.count)}</span>
+            </div>`).join('')
+        }</div>` : '';
+        return `<div class="team-card">
+          <div class="team-hdr" onclick="toggleTeam('${key}')">
+            <span class="team-name">${name}</span>
+            <span class="team-prog">${col}/${stks.length}${repInfo}</span>
+            <span style="font-size:11px;color:var(--sub)">${isOpen?'▲':'▼'}</span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill" style="width:${pct}%;background:${pct===100?'var(--green)':'#378add'}"></div></div>
+          ${stkHTML}
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+
+async function toggleStk(key, currentCount) {
+  // Cycle: miss→has→rep→miss
+  if (currentCount === 0) {
+    await fetch('/api/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key})});
+  } else {
+    await fetch('/api/remove', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key})});
+  }
+  const r = await fetch('/api/stickers');
+  ALL = await r.json();
+  await updateStats();
+  renderCollection();
+  renderRepeated();
+  renderMissing();
+}
+
+function toggleTeam(key) {
+  openTeam = openTeam === key ? null : key;
+  renderCollection();
+}
+
+function renderRepeated() {
+  const el = document.getElementById('rep-list');
+  if (!el) return;
+  const rep = Object.entries(ALL).filter(([k,v]) => v.count > 1);
+  if (!rep.length) {
+    el.innerHTML = '<div class="empty">No tienes figuritas repetidas 🎉</div>';
+    return;
+  }
+  el.innerHTML = rep.map(([k,v]) => `
+    <div class="list-item">
+      <span class="code">${k}</span>
+      <span class="team">${v.team}</span>
+      <span class="badge badge-rep">×${v.count} (${v.count-1} extra${v.count-1>1?'s':''})</span>
+    </div>`).join('');
+}
+
+function renderMissing() {
+  const el = document.getElementById('miss-list');
+  if (!el) return;
+  const q = (document.getElementById('miss-search')||{value:''}).value.toUpperCase();
+  const miss = Object.entries(ALL).filter(([k,v]) => v.count === 0 && (!q || k.includes(q) || v.team.toUpperCase().includes(q)));
+  if (!miss.length) {
+    el.innerHTML = '<div class="empty">¡Álbum completo! 🏆</div>';
+    return;
+  }
+  el.innerHTML = miss.map(([k,v]) => `
+    <div class="list-item">
+      <span class="code">${k}</span>
+      <span class="team">${v.team} <span style="font-size:11px;color:#aaa">G${v.group}</span></span>
+      <span class="badge badge-miss">Falta</span>
+    </div>`).join('');
+}
+
+function groupTeams() {
+  const GROUPS = [
+    ["A",[{code:"MEX",name:"México"},{code:"RSA",name:"Sudáfrica"},{code:"KOR",name:"Corea del Sur"},{code:"CZE",name:"Chequia"}]],
+    ["B",[{code:"CAN",name:"Canadá"},{code:"BIH",name:"Bosnia y Herz."},{code:"QAT",name:"Catar"},{code:"SUI",name:"Suiza"}]],
+    ["C",[{code:"BRA",name:"Brasil"},{code:"MAR",name:"Marruecos"},{code:"HAI",name:"Haití"},{code:"SCO",name:"Escocia"}]],
+    ["D",[{code:"USA",name:"EEUU"},{code:"PAR",name:"Paraguay"},{code:"AUS",name:"Australia"},{code:"TUR",name:"Turquía"}]],
+    ["E",[{code:"GER",name:"Alemania"},{code:"CUW",name:"Curazao"},{code:"CIV",name:"C. de Marfil"},{code:"ECU",name:"Ecuador"}]],
+    ["F",[{code:"NED",name:"Países Bajos"},{code:"JPN",name:"Japón"},{code:"SWE",name:"Suecia"},{code:"TUN",name:"Túnez"}]],
+    ["G",[{code:"BEL",name:"Bélgica"},{code:"EGY",name:"Egipto"},{code:"IRN",name:"Irán"},{code:"NZL",name:"Nueva Zelanda"}]],
+    ["H",[{code:"ESP",name:"España"},{code:"CPV",name:"Cabo Verde"},{code:"KSA",name:"Arabia Saudita"},{code:"URU",name:"Uruguay"}]],
+    ["I",[{code:"FRA",name:"Francia"},{code:"SEN",name:"Senegal"},{code:"IRQ",name:"Irak"},{code:"NOR",name:"Noruega"}]],
+    ["J",[{code:"ARG",name:"Argentina"},{code:"ALG",name:"Argelia"},{code:"AUT",name:"Austria"},{code:"JOR",name:"Jordania"}]],
+    ["K",[{code:"POR",name:"Portugal"},{code:"COD",name:"RD Congo"},{code:"UZB",name:"Uzbekistán"},{code:"COL",name:"Colombia"}]],
+    ["L",[{code:"ENG",name:"Inglaterra"},{code:"CRO",name:"Croacia"},{code:"GHA",name:"Ghana"},{code:"PAN",name:"Panamá"}]],
+    ["FW",[{code:"FW",name:"Especiales FIFA"}]],
+  ];
+  return Object.fromEntries(GROUPS);
+}
+
+init();
+</script>
+</body>
+</html>

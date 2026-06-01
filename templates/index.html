@@ -135,6 +135,19 @@
   <div class="tab" onclick="showTab('faltan',this)">❌ Me faltan</div>
 </div>
 
+
+<!-- BACKUP BAR -->
+<div id="backup-bar" style="display:flex;gap:8px;padding:10px 12px;background:#1a1a2e;">
+  <button onclick="exportBackup()" style="flex:1;background:#2a5298;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">
+    💾 Guardar backup
+  </button>
+  <label style="flex:1;background:#2d6a4f;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;">
+    📂 Cargar backup
+    <input type="file" accept=".json" onchange="importBackup(this)" style="display:none">
+  </label>
+</div>
+<div id="backup-msg" style="display:none;padding:8px 12px;font-size:12px;text-align:center;"></div>
+
 <!-- INGRESAR -->
 <div id="tab-ingresar" class="panel active">
   <p class="section-title">Agregar una figurita</p>
@@ -192,6 +205,48 @@ let ALL = {};
 let openTeam = null;
 let colFilter = 'todas';
 let history = [];
+
+
+async function exportBackup() {
+  window.location.href = '/api/export';
+}
+
+async function importBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const text = await file.text();
+  try {
+    const data = JSON.parse(text);
+    const r = await fetch('/api/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({data})
+    });
+    const d = await r.json();
+    const msg = document.getElementById('backup-msg');
+    if (d.ok) {
+      msg.style.display = 'block';
+      msg.style.background = '#e8f7ed';
+      msg.style.color = '#1a7a3a';
+      msg.textContent = '✅ Backup cargado: ' + d.stats.have + ' figuritas restauradas';
+      const r2 = await fetch('/api/stickers');
+      ALL = await r2.json();
+      await updateStats();
+      renderCollection();
+      renderRepeated();
+      renderMissing();
+      setTimeout(() => msg.style.display = 'none', 4000);
+    } else {
+      msg.style.display = 'block';
+      msg.style.background = '#fde8e8';
+      msg.style.color = '#b83232';
+      msg.textContent = '❌ Error: ' + d.msg;
+    }
+  } catch(e) {
+    alert('Archivo inválido. Asegúrate de usar un backup descargado desde esta app.');
+  }
+  input.value = '';
+}
 
 async function init() {
   const r = await fetch('/api/stickers');

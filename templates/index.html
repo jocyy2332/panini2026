@@ -139,12 +139,15 @@
 <!-- BACKUP BAR -->
 <div id="backup-bar" style="display:flex;gap:8px;padding:10px 12px;background:#1a1a2e;">
   <button onclick="exportBackup()" style="flex:1;background:#2a5298;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">
-    💾 Guardar backup
+    💾 Backup
   </button>
   <label style="flex:1;background:#2d6a4f;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;">
-    📂 Cargar backup
+    📂 Cargar
     <input type="file" accept=".json" onchange="importBackup(this)" style="display:none">
   </label>
+  <button onclick="exportExcel()" style="flex:1;background:#1a6b3a;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">
+    📊 Excel
+  </button>
 </div>
 <div id="backup-msg" style="display:none;padding:8px 12px;font-size:12px;text-align:center;"></div>
 
@@ -206,6 +209,11 @@ let openTeam = null;
 let colFilter = 'todas';
 let history = [];
 
+
+
+async function exportExcel() {
+  window.location.href = '/api/export/excel';
+}
 
 async function exportBackup() {
   window.location.href = '/api/export';
@@ -480,7 +488,7 @@ function groupTeams() {
     ["J",[{code:"ARG",name:"Argentina"},{code:"ALG",name:"Argelia"},{code:"AUT",name:"Austria"},{code:"JOR",name:"Jordania"}]],
     ["K",[{code:"POR",name:"Portugal"},{code:"COD",name:"RD Congo"},{code:"UZB",name:"Uzbekistán"},{code:"COL",name:"Colombia"}]],
     ["L",[{code:"ENG",name:"Inglaterra"},{code:"CRO",name:"Croacia"},{code:"GHA",name:"Ghana"},{code:"PAN",name:"Panamá"}]],
-    ["FW",[{code:"FW",name:"Especiales FIFA"}]],
+    ["FW",[{code:"FWC",name:"FIFA World Cup"},{code:"CC",name:"Coca-Cola"}]],
   ];
   return Object.fromEntries(GROUPS);
 }

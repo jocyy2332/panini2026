@@ -4,6 +4,12 @@ Ejecutar: python app.py
 """
 from flask import Flask, jsonify, request, render_template, send_file
 import json, os, io
+try:
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment
+    EXCEL_OK = True
+except:
+    EXCEL_OK = False
 
 app = Flask(__name__)
 SAVE_FILE = "progreso.json"
@@ -21,14 +27,17 @@ GROUPS = [
     ("J", [("ARG","Argentina"), ("ALG","Argelia"), ("AUT","Austria"), ("JOR","Jordania")]),
     ("K", [("POR","Portugal"), ("COD","RD Congo"), ("UZB","Uzbekistán"), ("COL","Colombia")]),
     ("L", [("ENG","Inglaterra"), ("CRO","Croacia"), ("GHA","Ghana"), ("PAN","Panamá")]),
-    ("FW",[("FW","Especiales FIFA")]),
+    ("FW",[("FWC","FIFA World Cup"), ("CC","Coca-Cola")]),
 ]
+
+SPECIAL_COUNTS = {"FWC": 19, "CC": 14}
 
 def build_stickers():
     s = {}
     for group, teams in GROUPS:
         for code, name in teams:
-            for i in range(1, 21):
+            total = SPECIAL_COUNTS.get(code, 20)
+            for i in range(1, total + 1):
                 key = f"{code} {i}"
                 s[key] = {"group": group, "team": name, "code": code, "num": i, "count": 0}
     return s
@@ -137,6 +146,97 @@ def api_import():
         return jsonify({"ok": True, "stats": stats})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)})
+
+
+@app.route("/api/export/excel")
+def api_export_excel():
+    """Descarga el progreso como Excel"""
+    if not EXCEL_OK:
+        return jsonify({"error": "openpyxl no instalado"}), 500
+
+    stickers = load_data()
+    wb = openpyxl.Workbook()
+
+    # ── Hoja 1: Resumen ──
+    ws = wb.active
+    ws.title = "Resumen"
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 22
+
+    stats = get_stats(stickers)
+    ws.append(["Panini FIFA World Cup 2026"])
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.append([])
+    ws.append(["Tengo",     stats["have"]])
+    ws.append(["Me faltan", stats["missing"]])
+    ws.append(["Repetidas", stats["repeated"]])
+    ws.append(["Total",     stats["total"]])
+    ws.append(["% completado", f"{stats['pct']}%"])
+
+    # ── Hoja 2: Colección completa ──
+    ws2 = wb.create_sheet("Colección")
+    ws2.column_dimensions["A"].width = 12
+    ws2.column_dimensions["B"].width = 22
+    ws2.column_dimensions["C"].width = 10
+    ws2.column_dimensions["D"].width = 14
+    ws2.column_dimensions["E"].width = 10
+
+    headers = ["Código", "Equipo", "Grupo", "Estado", "Copias"]
+    ws2.append(headers)
+    for cell in ws2[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1A1A2E")
+        cell.alignment = Alignment(horizontal="center")
+
+    green  = PatternFill("solid", fgColor="E8F7ED")
+    red    = PatternFill("solid", fgColor="FDE8E8")
+    orange = PatternFill("solid", fgColor="FFF3E0")
+
+    for key, v in stickers.items():
+        count = v["count"]
+        estado = "✅ Tengo" if count == 1 else ("🔁 Repetida" if count > 1 else "❌ Falta")
+        row = [key, v["team"], f"Grupo {v['group']}", estado, count]
+        ws2.append(row)
+        fill = green if count == 1 else (orange if count > 1 else red)
+        for cell in ws2[ws2.max_row]:
+            cell.fill = fill
+            cell.alignment = Alignment(horizontal="center")
+
+    # ── Hoja 3: Repetidas ──
+    ws3 = wb.create_sheet("Repetidas")
+    ws3.column_dimensions["A"].width = 12
+    ws3.column_dimensions["B"].width = 22
+    ws3.column_dimensions["C"].width = 10
+    ws3.column_dimensions["D"].width = 14
+    ws3.column_dimensions["E"].width = 14
+    ws3.append(["Código", "Equipo", "Grupo", "Copias totales", "Extras p/cambiar"])
+    for cell in ws3[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="C05A00")
+        cell.alignment = Alignment(horizontal="center")
+    for key, v in stickers.items():
+        if v["count"] > 1:
+            ws3.append([key, v["team"], f"Grupo {v['group']}", v["count"], v["count"]-1])
+
+    # ── Hoja 4: Faltantes ──
+    ws4 = wb.create_sheet("Me faltan")
+    ws4.column_dimensions["A"].width = 12
+    ws4.column_dimensions["B"].width = 22
+    ws4.column_dimensions["C"].width = 10
+    ws4.append(["Código", "Equipo", "Grupo"])
+    for cell in ws4[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="B83232")
+        cell.alignment = Alignment(horizontal="center")
+    for key, v in stickers.items():
+        if v["count"] == 0:
+            ws4.append([key, v["team"], f"Grupo {v['group']}"])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="panini2026_reporte.xlsx")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

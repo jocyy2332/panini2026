@@ -1,15 +1,13 @@
 """
 Panini FIFA World Cup 2026 - Web App
 Ejecutar: python app.py
-Abrir en celular: http://<tu-ip>:5000
 """
-from flask import Flask, jsonify, request, render_template
-import json, os
+from flask import Flask, jsonify, request, render_template, send_file
+import json, os, io
 
 app = Flask(__name__)
 SAVE_FILE = "progreso.json"
 
-# ── Datos del álbum (orden oficial Panini 2026) ──
 GROUPS = [
     ("A", [("MEX","México"), ("RSA","Sudáfrica"), ("KOR","Corea del Sur"), ("CZE","Chequia")]),
     ("B", [("CAN","Canadá"), ("BIH","Bosnia y Herz."), ("QAT","Catar"), ("SUI","Suiza")]),
@@ -64,7 +62,6 @@ def get_stats(stickers):
         "pct":      round(have / total * 100, 1) if total else 0,
     }
 
-# ── Rutas ──
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -101,7 +98,6 @@ def api_remove():
 
 @app.route("/api/bulk", methods=["POST"])
 def api_bulk():
-    """Agregar múltiples figuritas de una lista de texto"""
     text = request.json.get("text","")
     stickers = load_data()
     added, not_found = [], []
@@ -116,6 +112,31 @@ def api_bulk():
     if added:
         save_data(stickers)
     return jsonify({"ok": True, "added": added, "not_found": not_found})
+
+@app.route("/api/export")
+def api_export():
+    """Descarga el progreso como archivo JSON backup"""
+    stickers = load_data()
+    data = {k: v["count"] for k, v in stickers.items() if v["count"] > 0}
+    buf = io.BytesIO(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+    buf.seek(0)
+    return send_file(buf, mimetype="application/json",
+                     as_attachment=True, download_name="panini2026_backup.json")
+
+@app.route("/api/import", methods=["POST"])
+def api_import():
+    """Restaura el progreso desde un archivo JSON backup"""
+    try:
+        data = request.json.get("data", {})
+        stickers = build_stickers()
+        for k, v in data.items():
+            if k in stickers:
+                stickers[k]["count"] = int(v)
+        save_data(stickers)
+        stats = get_stats(stickers)
+        return jsonify({"ok": True, "stats": stats})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

@@ -5,16 +5,12 @@ Ejecutar: python app.py
 from flask import Flask, jsonify, request, render_template, send_file
 import json, os, io
 try:
-    import pandas as pd
-    PANDAS_OK = True
-except:
-    PANDAS_OK = False
-try:
     import openpyxl
     from openpyxl.styles import PatternFill, Font, Alignment
     EXCEL_OK = True
 except:
     EXCEL_OK = False
+PANDAS_OK = False
 
 app = Flask(__name__)
 SAVE_FILE = "progreso.json"
@@ -156,40 +152,62 @@ def api_import():
 
 @app.route("/api/import/excel", methods=["POST"])
 def api_import_excel():
-    if not PANDAS_OK:
-        return jsonify({"ok": False, "msg": "pandas no instalado"})
+    if not EXCEL_OK:
+        return jsonify({"ok": False, "msg": "openpyxl no instalado"})
     try:
         file = request.files.get("file")
         if not file:
             return jsonify({"ok": False, "msg": "No se recibio archivo"})
 
-        import io as _io
-        raw = file.read()
+        wb = openpyxl.load_workbook(file)
         stickers = build_stickers()
 
-        try:
-            df_miss = pd.read_excel(_io.BytesIO(raw), sheet_name="Faltantes")
-            df_miss = df_miss[df_miss["Código"].notna()]
-            missing = set(df_miss["Código"].astype(str).str.strip().tolist())
-        except:
-            missing = set()
+        # Read Faltantes sheet
+        missing = set()
+        if "Faltantes" in wb.sheetnames:
+            ws = wb["Faltantes"]
+            headers = [str(c.value).strip() if c.value else "" for c in ws[1]]
+            try:
+                col_idx = headers.index("Código")
+            except ValueError:
+                col_idx = 1
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                val = row[col_idx] if col_idx < len(row) else None
+                if val:
+                    missing.add(str(val).strip())
 
-        try:
-            df_rep = pd.read_excel(_io.BytesIO(raw), sheet_name="Repetidas (Duplicados)")
-            df_rep = df_rep[df_rep["Código"].notna() & df_rep["Código"].astype(str).str.match(r"^[A-Z]+\s+\d+$")]
-            df_rep["Copias Extra"] = df_rep["Copias Extra"].fillna(1).astype(int)
-        except:
-            df_rep = None
-
+        # Set base counts
         for key in stickers:
             stickers[key]["count"] = 0 if key in missing else 1
 
-        if df_rep is not None:
-            for _, row in df_rep.iterrows():
-                key = str(row["Código"]).strip()
-                extras = int(row["Copias Extra"])
-                if key in stickers:
-                    stickers[key]["count"] = 1 + extras
+        # Read Repetidas sheet
+        rep_sheet = None
+        for name in wb.sheetnames:
+            if "Repetidas" in name or "Duplicados" in name:
+                rep_sheet = wb[name]
+                break
+
+        if rep_sheet:
+            headers = [str(c.value).strip() if c.value else "" for c in rep_sheet[1]]
+            try:
+                cod_idx = headers.index("Código")
+            except ValueError:
+                cod_idx = 1
+            try:
+                ext_idx = headers.index("Copias Extra")
+            except ValueError:
+                ext_idx = 3
+            for row in rep_sheet.iter_rows(min_row=2, values_only=True):
+                code = row[cod_idx] if cod_idx < len(row) else None
+                extras = row[ext_idx] if ext_idx < len(row) else None
+                if code and str(code).strip():
+                    key = str(code).strip()
+                    try:
+                        ex = int(float(str(extras))) if extras else 1
+                    except:
+                        ex = 1
+                    if key in stickers:
+                        stickers[key]["count"] = 1 + ex
 
         save_data(stickers)
         stats = get_stats(stickers)

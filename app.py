@@ -5,6 +5,11 @@ Ejecutar: python app.py
 from flask import Flask, jsonify, request, render_template, send_file
 import json, os, io
 try:
+    import pandas as pd
+    PANDAS_OK = True
+except:
+    PANDAS_OK = False
+try:
     import openpyxl
     from openpyxl.styles import PatternFill, Font, Alignment
     EXCEL_OK = True
@@ -147,6 +152,50 @@ def api_import():
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)})
 
+
+
+@app.route("/api/import/excel", methods=["POST"])
+def api_import_excel():
+    if not PANDAS_OK:
+        return jsonify({"ok": False, "msg": "pandas no instalado"})
+    try:
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"ok": False, "msg": "No se recibio archivo"})
+
+        import io as _io
+        raw = file.read()
+        stickers = build_stickers()
+
+        try:
+            df_miss = pd.read_excel(_io.BytesIO(raw), sheet_name="Faltantes")
+            df_miss = df_miss[df_miss["Código"].notna()]
+            missing = set(df_miss["Código"].astype(str).str.strip().tolist())
+        except:
+            missing = set()
+
+        try:
+            df_rep = pd.read_excel(_io.BytesIO(raw), sheet_name="Repetidas (Duplicados)")
+            df_rep = df_rep[df_rep["Código"].notna() & df_rep["Código"].astype(str).str.match(r"^[A-Z]+\s+\d+$")]
+            df_rep["Copias Extra"] = df_rep["Copias Extra"].fillna(1).astype(int)
+        except:
+            df_rep = None
+
+        for key in stickers:
+            stickers[key]["count"] = 0 if key in missing else 1
+
+        if df_rep is not None:
+            for _, row in df_rep.iterrows():
+                key = str(row["Código"]).strip()
+                extras = int(row["Copias Extra"])
+                if key in stickers:
+                    stickers[key]["count"] = 1 + extras
+
+        save_data(stickers)
+        stats = get_stats(stickers)
+        return jsonify({"ok": True, "stats": stats})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)})
 
 @app.route("/api/export/excel")
 def api_export_excel():

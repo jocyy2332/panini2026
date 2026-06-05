@@ -148,6 +148,10 @@
   <button onclick="exportExcel()" style="flex:1;background:#1a6b3a;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">
     📊 Excel
   </button>
+  <label style="flex:1;background:#7b2d8b;color:#fff;border:none;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;">
+    📥 Subir Excel
+    <input type="file" accept=".xlsx" onchange="importExcel(this)" style="display:none">
+  </label>
 </div>
 <div id="backup-msg" style="display:none;padding:8px 12px;font-size:12px;text-align:center;"></div>
 
@@ -210,6 +214,61 @@ let colFilter = 'todas';
 let history = [];
 
 
+
+
+async function importExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  const msg = document.getElementById('backup-msg');
+  msg.style.display = 'block';
+  msg.style.background = '#e8f0fe';
+  msg.style.color = '#1a1a2e';
+  msg.textContent = '⏳ Importando Excel...';
+  try {
+    const r = await fetch('/api/import/excel', {method: 'POST', body: formData});
+    const d = await r.json();
+    if (d.ok) {
+      msg.style.background = '#e8f7ed';
+      msg.style.color = '#1a7a3a';
+      msg.textContent = `✅ Excel importado: ${d.stats.have} figuritas cargadas`;
+      const r2 = await fetch('/api/stickers');
+      ALL = await r2.json();
+      await updateStats();
+      renderCollection();
+      renderRepeated();
+      renderMissing();
+    } else {
+      msg.style.background = '#fde8e8';
+      msg.style.color = '#b83232';
+      msg.textContent = '❌ Error: ' + d.msg;
+    }
+    setTimeout(() => msg.style.display = 'none', 5000);
+  } catch(e) {
+    msg.style.background = '#fde8e8';
+    msg.style.color = '#b83232';
+    msg.textContent = '❌ Error al importar el archivo.';
+  }
+  input.value = '';
+}
+
+async function tradeOne(key) {
+  if (!confirm(`¿Confirmas que intercambiaste la figurita ${key}?`)) return;
+  const r = await fetch('/api/remove', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({key})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    ALL[key].count = d.count;
+    await updateStats();
+    renderCollection();
+    renderRepeated();
+    renderMissing();
+  }
+}
 
 async function exportExcel() {
   window.location.href = '/api/export/excel';
@@ -454,6 +513,9 @@ function renderRepeated() {
       <span class="code">${k}</span>
       <span class="team">${v.team}</span>
       <span class="badge badge-rep">×${v.count} (${v.count-1} extra${v.count-1>1?'s':''})</span>
+      <button onclick="tradeOne('${k}')" style="margin-left:6px;padding:5px 10px;background:#b83232;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">
+        🤝 Intercambié
+      </button>
     </div>`).join('');
 }
 
